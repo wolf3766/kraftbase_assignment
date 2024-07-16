@@ -3,14 +3,24 @@ import { StatusCodes } from 'http-status-codes';
 import { response } from '../helper/response';
 import { Iorder, IorderRating } from '../models/order.model';
 import { fetchOrders, createOrder, updateUserRating, updateOrderDeliveryStatus } from '../services/order_service';
-import { fetchDeliveryAgents } from '../services/delivery_agent_service';
+import { fetchDeliveryAgents, updateDeliveryAgentAvailability } from '../services/delivery_agent_service';
 
 export const createRestaurantOrder = async (req: Request, res: Response) => {
     try {
         const order = req.body;
-        const agent_id = await fetchDeliveryAgents();
-        order.delivery_agent_id = agent_id[0]._id;
-        const order_id = (await createOrder({...order} as Iorder)).insertedId;
+        const agents = await fetchDeliveryAgents();
+
+        if (agents.length === 0) {
+            return response.setError(
+                StatusCodes.NOT_FOUND,
+                "No delivery agents available",
+                "No delivery agents available"
+            ).send(res);
+        }
+        
+        order.delivery_agent_id = agents[0]._id;
+        const order_id = (await createOrder({ ...order } as Iorder)).insertedId;
+        await updateDeliveryAgentAvailability(order.delivery_agent_id, false);
         return response.setSuccess(
             true,
             StatusCodes.OK,
